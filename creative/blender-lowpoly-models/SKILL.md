@@ -113,6 +113,20 @@ Delete `tools/blender/__pycache__` afterwards (or keep it gitignored).
   minimized. The socket has no auth: localhost only, close Blender when done.
 - Windows shell: background jobs (and foreground timeouts over 600 s) lose exported variables,
   so `$SCRATCH`-style paths become `/` and files land in the git-bash root. Spell paths out.
+- Budget before building: every box is 12 triangles, and iso-engine allows under 1,500 per
+  model. A long facade blows it fast (52 windows at 5 boxes each came to 3,900): give each
+  window 2 boxes (white frame behind, glass in front), leave gable ends blank, drop sub-metre
+  details. The build's stats line reads `key  triangles  vertices  size  KB`.
+- Weathering for free: a broken pane is the glass box in `black`, a boarded one in `wood_dark`,
+  chosen with `m.rng` (iso-engine: `weathered_glass` in `models_terrain.py`); no extra triangles.
+- A model can ship in its own art style: `@model(key, path, style="rugged")` (iso-engine kit);
+  the default build keeps it, `--style X --out DIR` overrides it. New palette colours need an
+  entry in `PALETTE` (clean) and may get a rugged override. Rugged dents push vertices just
+  above the ground below it (`does not stand on z = 0` warnings): the kit clamps them; add
+  `m.cut_ground()` to heaps whose tilted parts dip below z = 0.
+- With a live Blender (MCP), import the built `.glb` files into a collection of your own and
+  `look` with `mode="angles"` and explicit view vectors; remove the collection (and orphaned
+  meshes and `iso.*` materials) when done: it is the user's scene.
 
 ## Verification
 - The build prints no `warning:` line; contact sheets and an in-game capture were looked at.

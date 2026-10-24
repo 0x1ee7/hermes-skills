@@ -222,6 +222,15 @@ Scripts: `references/windows-harnesses.md`.
   test file from a backup copy: extract, project each draw's centre to pixels, list the ones in
   the region with their flags) instead of guessing from the picture. Never write files into the
   user's screenshot folder: they find their newest screenshots by date there.
+- Sound, without ears: append a throwaway probe test (from a backup copy, restored byte for
+  byte) that loads the level headless, inserts the engine's mixer output, scripts the input,
+  and after every `app.update(1/60)` mixes 1/60 s into a buffer written as a stereo WAV, with a
+  log line per sound as it starts (source, sound key, intended left/right gains). Then measure
+  the samples (numpy via `uv run`): spectral centroid per material proves the variants differ,
+  L/R RMS of isolated events against the intended gains proves the panning, peak and clipped
+  counts the mix. A running player's steps overlap everything every 0.15 s and sit centred
+  (the listener follows the player): isolate other sources by standing still and turning the
+  view. Leave the WAVs in scratch for the user to listen to; their ears still decide.
 - CPU while minimized: `ShowWindow(h, 6)`, sample `Process.TotalProcessorTime`, restore with
   `ShowWindow(h, 9)`. Log tick counts at pause and resume to prove the simulation did not jump.
 - Smoothness/interpolation: prove it numerically in an `App`-level test (the drawn position
@@ -261,6 +270,15 @@ Scripts: `references/windows-harnesses.md`.
   edits in the queue's "Agent files" section (by file; the later entry wins; the root
   `AGENTS.md` points at the queue files and says the queue is newer), go on with the code, and
   apply them later in one approval round (`agent-context-files`, Rules).
+  When the integration suite checks agent files (a new crate needs its own), the items that need
+  them cannot pass the gates, so leave them uncommitted and make the approval round one patch:
+  copy the working tree (`git ls-files --cached --others --exclude-standard`) to scratch, `git
+  init` and commit it there, apply the edits with an asserted-replace script, `git add -N` the
+  new files and save `git diff` beside the plan (`.hermes/plans/*.patch`; `git apply --check`
+  it in the repo). Run the suite in the copy with its own `CARGO_TARGET_DIR` (a cold build, ~4
+  min) and mutate the copy's new agent file once (drop a dependency) to see the check bite.
+  Measure the Hermes budget there too: root plus each boundary file under 20,000 characters;
+  make room by cutting restatements (a sentence repeating a rule) before others' facts.
 - Lint-enforcement items: list the sites with `lint-sites.sh '<warning text>' -- -W <lint>`,
   which needs no Cargo.toml change. The `[workspace.lints]` switch goes in last (loop step 3).
 - Bulk `missing_docs` fixes: drive one script from the `path:line|source` list. Insert bottom-up,

@@ -79,6 +79,9 @@ Then `cargo run -- <level>`; the demo's tests cover every `level.*` key in the m
 - `why_not.py` runs the whole recipe, so it also reports models placed after the failure.
 - Windows: foreground timeouts over 600 s turn into background jobs that lose exported
   variables; `.git/index.lock` from an editor's git integration needs a retry, not a delete.
+- Levels with heights, water, decks or storeys below the ground (bridges, fords, cliffs,
+  bunkers): read references/relief-levels.md first; the height order and the bridge, deck and
+  reach-goal pitfalls there each cost a debugging round.
 
 ## Verification
 - `build_levels.py --check` says "N current"; `cargo test --workspace` passes (levels parse,
@@ -94,3 +97,6 @@ Then `cargo run -- <level>`; the demo's tests cover every `level.*` key in the m
   the map and camera afterwards. It calls a `capture_level.ps1` next to it, which this skill
   does not ship: put one there before running it.
 - `scripts/levels_sheet.py`: labelled summer/winter contact sheet for the README.
+- `references/relief-levels.md`: relief (terrain) levels: kit calls, height order, pitfalls.
+- `scripts/spawn_at.py`, `scripts/capture_at.sh`: move the spawn (also below the ground) and
+  capture with the game-window-control skill's `gamewin.py`; no PowerShell needed.

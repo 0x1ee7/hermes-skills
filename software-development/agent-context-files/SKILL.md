@@ -105,3 +105,12 @@ any folder actually receives, with Hermes's own loader and injection scanner.
   carries one static pointer to where work is tracked (queue files, plans) and says that a
   queue's pending agent-file changes are newer than the files. While edits cannot be approved,
   freeze the files and collect each pending change in the queue, by file, for one batch later.
+- Applying such a batch: fold each file's entries in order (the later wins; superseded features
+  drop out), drop the item IDs, and measure every count and line number against today's code,
+  not the entries. Then put "Applied on <date>; nothing here is pending" at the top of the
+  queue section and update the handoff's and the plan's next steps. Under the "queue is newer"
+  rule, a list without that line gets applied again, stale entries included.
+- Size each draft together with the root file before writing (`check_context_files.py load`
+  after, `--expect` per folder). The boundary that collected the most entries outgrows the
+  cap first: shorten by pointing at the docs (a design doc, the other boundary's Provides)
+  rather than dropping invariants.

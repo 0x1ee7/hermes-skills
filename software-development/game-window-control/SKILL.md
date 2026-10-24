@@ -98,6 +98,7 @@ Against a winit 0.30 game (wgpu on Vulkan) on Windows 11, with its window unfocu
 | Input or call | Result |
 |---|---|
 | `launch` | shown without focus (`focus kept`); first picture after about 1 s; outlived the launching call |
+| `launch`, ten times in a row | after the first, most runs reported `focus taken by the game`: batch captures into few launches and tell the user |
 | keys: a letter, `W+Shift` held, a `Tab` tap, `F5`, `Up` (extended) | reached the game |
 | `wheel` | reached the game (zoom) |
 | `move` (hover) | no effect: the game's hover highlight never appeared |
@@ -129,6 +130,9 @@ Treat any other engine as unknown until step 2 passes, and add what you learn to
 - **Taps** last 60 ms (`--tap-ms`): two frames or more at 30 fps.
 - **The game keeps running** after a `run`. Close it, and set the game's own safety exit if
   it has one (a frame-count environment variable, for example).
+- **Sound.** A driven game plays through the user's speakers while they work. Launch it with
+  its mute switch when sound is not what you check (`--env ISO_AUDIO=0` for the iso engine);
+  check audio headlessly instead, or leave the listening to the user.
 
 ## Safety (hard rules)
 
