@@ -58,6 +58,16 @@ writing calls.
   use `mat3x3(cross(b, c), cross(c, a), cross(a, b))` (the inverse transpose times the
   determinant). Multiply by the sign of `dot(a, cross(b, c))`, then normalise.
 
+## cpal 0.18 (audio device)
+
+- Bumping from 0.15: `SampleRate` is a plain `u32` (no `.0`); a device's name is
+  `device.description()?.name()` (`Device::name` is gone); `build_output_stream` takes its
+  `StreamConfig` by value, and the type is `Copy`, so pass `*config` (clippy rejects a
+  `clone`). `SampleFormat` gained more variants: match the ones the mixer converts to and
+  `bail!` on the rest, never panic. `cargo update -p cpal` also drops bindgen, clang-sys and
+  the Android crates from a desktop build; run `cargo deny check` and the smoke run with the
+  device on (`audio: <name> at <rate> Hz, <n> channels`) and off (`ISO_AUDIO=0`).
+
 ## winit 0.30
 
 - Pause while hidden. Paused means minimized (`window.is_minimized() == Some(true)` or `Resized`

@@ -1,6 +1,6 @@
 ---
 name: rust-workspace-review
-description: "Use when auditing a Rust/Cargo workspace for upgrades."
+description: "Use when auditing a Rust workspace for debt or upgrades."
 version: 1.1.0
 author: Hermes Agent
 license: MIT
@@ -18,6 +18,9 @@ Gather evidence with real commands; every finding gets a path:line.
 
 ## When to Use
 - "Analyze the codebase / what needs upgrading / touch-ups" on a Cargo workspace.
+- "Review as a senior engineer: shortcomings, modularity, what to refactor or remove" before
+  the next feature queue; the deliverable is then a plan (section 7) whose tasks are small
+  commits, and the user wants its open questions asked in one message before execution.
 - Pre-release or pre-phase health check of a Rust project (especially wgpu/winit/bevy_ecs engines).
 - Skip for reviewing a single diff (use requesting-code-review).
 
@@ -64,6 +67,31 @@ cargo deny check                                                      # when den
   that is a bundle file (fetch-only) or a long unpushed history means no off-machine copy and
   a CI workflow that has never run on that work; report it first, and never push unasked.
 - Toolchain `channel = "stable"` + CI `-D warnings` = CI breaks on new clippy lints; recommend pinning.
+- **Rules written twice**: grep the test modules of every crate for the same measurement
+  (`chunks(window)`, the same threshold constants, the same helper name); two copies drift (one
+  judged a sound's tail by overall RMS against the peak, the other per window against the
+  loudest window). Propose one method on the library type both tests call.
+- **Data recovered by regex over another script's source** (one tool parses a sibling's
+  dict literals because importing it would import numpy): propose a standard-library module
+  both import, and a CI check that derived files (credits, lists) follow from it.
+- **Generators that write nothing**: after assets are replaced by another pipeline, the old
+  generator keeps its CI `--check` (vacuous), its imports in other tools and its paragraphs in
+  the docs; grep the generator's name across `*.md`, `*.py`, `*.yml` and propose removal with
+  the history commit named as where the code lives on.
+- **History-dependent checks missing from CI**: a generated doc that cites commits
+  (`list_assets.py --check`) cannot run on a depth-1 checkout; `fetch-depth: 0` on the
+  checkout step, then add the step. Look for every repo `--check` the CI yaml does not run.
+- **Stale hand-drawn diagrams**: a README that presents diagram PDFs as current while the
+  repo's own agent files say they predate a crate or a suite; the fix is a sentence listing
+  what they miss and when to redraw, not a redraw.
+- **Oversized files along a reuse seam**: a source file over ~1,500 lines that holds a data
+  format plus the code that consumes it (parser + spawner + tests) is the cheap half of the
+  "move it to the engine when a second game needs it" item; propose a split by exact line
+  ranges, each range's first line asserted with `sed -n 'Np'` so the plan survives commits
+  made before it is executed.
+- Report what was checked and left alone, with the reason (a `&mut World` kept only for a
+  `QueryState` init, brute-force physics at 0.05 ms/update): the user asked for a senior
+  review, and a finding list without the considered-and-rejected list reads as incomplete.
 
 ## 4. Game-engine checklist (wgpu / winit / bevy_ecs style projects)
 - Fixed timestep: is the interpolation alpha actually read by rendering? If not -> judder above 60 Hz.
@@ -105,6 +133,10 @@ Say which findings are code-read vs measured. Offer to implement the small conta
 
 ## 7. Handoff file (when the user wants another agent to resume)
 - Write `docs/upgrade-backlog.md` (untracked; don't commit unasked). Keep the chat's item numbers.
+  When the review is asked for in plan mode, the deliverable is the plan file under
+  `.hermes/plans/` instead, with the same per-item shape; its first task opens a queue file in
+  `docs/` (checklist, commit rules with a `Queue: <ID>.` trailer, "Agent files" for timed-out
+  approvals, work log), as the repo's other queues do.
 - Top: snapshot (commit, baseline gate results, dep versions), evidence legend
   ([verified] / [code-read]), checklist with stable IDs, machine quirks, open decisions for the
   user, suggested batches with ordering dependencies, out-of-scope list, append-only work log.

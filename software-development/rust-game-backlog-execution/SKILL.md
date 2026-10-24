@@ -8,7 +8,7 @@ platforms: [windows, linux, macos]
 metadata:
   hermes:
     tags: [rust, cargo, wgpu, winit, bevy_ecs, tdd, git, windows, verification]
-    related_skills: [rust-workspace-review, test-driven-development, requesting-code-review, parallel-agent-boundaries]
+    related_skills: [rust-workspace-review, test-driven-development, requesting-code-review, parallel-agent-boundaries, game-footstep-banks, cc0-sound-sourcing]
 ---
 
 # Executing a Rust game-engine backlog (one verified commit per item)
@@ -30,7 +30,7 @@ desktop, and the pitfalls that cost time.
 - `scripts/lint-sites.sh`: every site of one warning as `path:line|source line`.
 - `scripts/ab.sh`: times a before and an after binary, alternating runs, and prints the means.
 - `references/engine-recipes.md`: GPU-free test recipes; API notes for wgpu 30, winit 0.30,
-  bevy_ecs 0.20 and gltf; fixed-timestep, texture and skinned-import recipes; rules for
+  bevy_ecs 0.20, gltf and cpal 0.18; fixed-timestep, texture and skinned-import recipes; rules for
   see-through and cutaway features (what may fade, the see-through circle).
 - `references/windows-harnesses.md`: window capture, pixel diff, CPU-while-minimized scripts.
 - `scripts/capture-keys.ps1`: start the game, play keys into its own window, capture at named
@@ -54,6 +54,11 @@ desktop, and the pitfalls that cost time.
 3. Get every approval the run will need while the user is there: window captures (PowerShell
    with `-ExecutionPolicy Bypass`), writes to `AGENTS.md`, deletions. A prompt that comes while
    they are away times out, and a timed-out action must not be retried or done another way.
+   When a plan carries open questions (remove dead code or keep it, archive or not), ask them
+   all in one message before the first commit, with a recommendation each, and ask for the
+   agent-file approval in the same message: this user answers in one line ("1 yes, 2 yes") and
+   wants the run to finish without stopping again. Record the blanket approval in the queue's
+   "Agent files" section.
 4. Run `gates.sh smoke doc` and record the test count as the baseline.
 
 ## Loop per item
@@ -88,7 +93,14 @@ desktop, and the pitfalls that cost time.
    commit must build and pass the gates on its own (the next commit must not be needed to make it
    compile, e.g. no item unused until a later commit, which `-D warnings` rejects as dead code).
    The item's last commit ticks it and adds the work-log line. Chain each one so a red gate never
-   commits: `gates.sh smoke && g add <files> && g commit -q -F - <<'EOF'`. Message: imperative
+   commits: `gates.sh smoke && g add <files> && g commit -q -F - <<'EOF'`. Never gate a commit
+   on a `grep` over test output: a pipeline's status is the last command's, and
+   `grep -E "ok|FAILED"` exits 0 on the failure line, so the chain commits a red tree (it
+   did: a suite failure rode into a commit and had to be amended). Use `gates.sh`, or run the
+   command alone and read its own exit code, or `grep -q FAILED && exit 1`. Nor `git add` a
+   list that includes a path already `git rm`'d or missing: one unmatched pathspec aborts the
+   whole add, and the commit that follows holds only what was staged before (the lone
+   deletion); `git diff --cached --stat` before every commit. Message: imperative
    subject, a short why-body and `Backlog: <ID>.` (or the queue's trailer); `git log --grep
    '<ID>'` then lists an item's commits. No `Co-Authored-By` trailer for the agent: this user
    dropped it, and copying trailers from recent commits would bring it back. When a repo's
@@ -100,7 +112,12 @@ desktop, and the pitfalls that cost time.
    While the user is reviewing on screen (sending screenshots, wanting to run the game), leave
    visual changes uncommitted until they approve: say where to look (level, spot, keys) and how
    to undo (`git restore <files>`). Commands for them to run: try them first in the same shell,
-   give the Git Bash and the PowerShell form, and end with the restore step.
+   give the Git Bash and the PowerShell form, and end with the restore step. The same holds for
+   anything they can hear: finish the work, run every gate, leave it uncommitted with a
+   listening preview in scratch, and draft the commit messages (a scratch `commits.txt`) so
+   their "commit" is two commands away. This user then says "commit and push" in one breath:
+   make the item's commits, the closing commit with the refreshed asset list, push and watch CI
+   without asking again.
 7. Items needing a user decision (licence holder, design option, new dependency, CI cost): skip
    and list them at the end. Never invent the answer.
 8. Bug reports: before removing code, confirm the suspected cause in the red test by switching
@@ -131,6 +148,17 @@ Ending a session ("finalize, new work starts from a new context"):
   last, apart from the item's closing commit.
 - Push only when asked; `git fetch` first and check `git rev-list --left-right --count
   origin/main...main` (behind must be 0; never force). Push existing tags only by name.
+  Check `git remote -v` before the first push of a session: when `origin` is a local path (a
+  secondary clone whose origin is the primary clone, as this user's per-queue clones are), a
+  push would be refused because the primary has that branch checked out. Instead, in the
+  primary clone: `git fetch <secondary path> main && git merge --ff-only FETCH_HEAD`, then its
+  `git push origin main`; `gh` only works there, where the remote is GitHub. Afterwards `git
+  fetch` in the secondary so `origin/main...main` reads `0 0` again.
+- "Retry approval prompts" / "apply agent md again" from the user means the timed-out
+  agent-file edits listed under the queue's "Agent files" are to be re-attempted now: apply
+  each as one `patch`, turn the pending entries into "applied", fix the handoff's and the
+  plan's "pending" sentences, run the integration suite as `AGENT_SCOPE='*'` (it checks the
+  agent files), commit as its own small commit, push by the route above and watch CI.
 - Watch the CI run of the push (`gh run list --branch main --limit 1`, then `gh run watch <id>
   --exit-status` in the background) and report its result: it is the only check of the
   software-rendered path. When git needs a `safe.directory` wrapper (exFAT), `gh` run inside
@@ -155,6 +183,29 @@ from its parent, keeping the old series on a backup branch:
 - Finish with `git diff <old-tip> <new-tip>` empty, then move the branch
   (`git switch main && git reset --hard <new-tip>`); tell the user the backup branch name.
 
+## Splitting a long source file into a module directory
+When a file holds several concerns (a format's types, its parser, a spawner, tests), split it
+without changing behaviour, as one commit:
+- `git mv src/level.rs src/level/mod.rs` first, so git records a rename; then slice `mod.rs`
+  into the new files with a script that takes line ranges and asserts the first line of every
+  range (`starts(305, "struct Scatter {")`): a derive attribute or a doc comment belongs to the
+  item below it, and consts that a sibling re-exports (`KEY_PREFIX`, `DEFAULT`) belong with
+  their users, so the ranges are easy to get off by a line; the assertion fails loudly.
+- Children start with `use super::*;`: the glob brings the parent's private `use` lines too,
+  so `mod.rs` keeps the shared imports and clippy stays clean. Helpers a sibling needs become
+  `pub(super)`; the compiler's `E0603`/`E0425` list is the whole to-do list. If a fix needs
+  more than visibility or imports, the cut point is wrong.
+- Never dedent a moved test module by hand: raw map strings keep their rows at column 0 and a
+  blanket dedent changes the data. Keep the body as it is and let `cargo fmt` re-indent the
+  code; it leaves string literals alone.
+- A whole-file test module has no `#[cfg(test)]` line, so a repo's source scans that take
+  "everything after `#[cfg(test)]`" as test code read its `include_str!("../assets/...")` as
+  violations. Open the file with `#![cfg(test)]` and teach the scan that inner attribute in
+  the same commit (and its agent file's invariant line). `include_str!` paths are relative to
+  the file: one more `../` per directory level.
+- Then grep the docs for `<file>.rs:N` pointers and point them at the new part and its current
+  line; update the agent file's reading order with the new files' sizes.
+
 ## Pulling upstream into a queue branch
 When the user asks for main's updates while a queue branch is unmerged: `git fetch`, then merge
 (`git merge --no-ff --no-commit main`), not rebase: the work log and the asset list cite the
@@ -162,6 +213,28 @@ branch's hashes. Resolve generated files by regenerating them (maps from recipes
 from the generator, then pixel-compare and restore the unchanged ones), give main's glyphs,
 keys and names precedence where both sides added the same thing, and refresh the asset list in
 the commit after the merge. Gate the merged tree with `AGENT_SCOPE='*'` before committing it.
+
+## Integrating a finished queue branch
+When the user asks to merge an agent's branch into main and push:
+- The branch often lives in another clone whose `origin` is the main repo: bring it over with
+  `git fetch <clone path> agent/<x>:agent/<x>`, check `git merge-base --is-ancestor main
+  agent/<x>`, then `git merge --ff-only`. Never rebase: the work log and the asset list cite
+  its hashes. `git branch -d` the fetched ref once main holds it.
+- Gate the merged tree as the integrator: every gate, the integration suite with
+  `AGENT_SCOPE='*' AGENT_BASE=<old main>`, each generator's `--check`, `cargo deny check`, the
+  MSRV check (its own target dir), and a smoke run per level the branch added, with the new
+  subsystem on and off (its env switch).
+- Review the contract between the two halves of a new subsystem, not only each half: a value
+  one side clamps and the other uses raw (a mixer holding speed to 0.25..4 while the ECS clock
+  used the raw speed leaked despawn-on-end entities at speed 0). Fix it test first, as a
+  commit of its own.
+- When CI runs a byte-exact generator `--check` on Linux over files made on Windows, run it
+  under WSL first, since libm results can differ: copy the script to scratch, patch syntax the
+  distro's Python lacks (3.8: module-level `dict[...]` annotations, `Path.is_relative_to`),
+  and run `--check --out /mnt/c/<repo>/assets/<folder>`.
+- Then one docs commit after the fix, since it cites the fix's hash: the handoff's state and
+  next steps, a work-log line in the queue, the plan's Progress. Push, check `git ls-remote`,
+  and watch the run (`gh run watch <id> --exit-status`).
 
 ## Committing a finished working tree as several commits
 When several logical changes already sit uncommitted in one tree:
@@ -263,12 +336,12 @@ Scripts: `references/windows-harnesses.md`.
   counts the mix. A running player's steps overlap everything every 0.15 s and sit centred
   (the listener follows the player): isolate other sources by standing still and turning the
   view. Leave the WAVs in scratch for the user to listen to; their ears still decide.
-- A user hearing "echo" or "long tails" in synthesised one-shots: measure each file first
-  (length, when it falls 40 and 60 dB below its loudest, how many strikes: a 6 dB rise within
-  10 ms above -24 dB). Heel-and-toe steps are two strikes, resonances cut off by the file's end
-  ring on, and a step every 0.15 s piles them up; the mixer is rarely the cause (check it clears
-  its buffer). Fix the generator (one strike, decays shorter than the file, refuse a sound not
-  silent at its end) and pin it with a manifest-wide test, seen failing on the old files.
+- Sound the user hears as fabricated, high-pitched, harsh or echoing: the skills
+  `game-footstep-banks` (the one-shot rules, A-weighted measurement, cutting walking
+  recordings into single contacts, what made synthesis less harsh) and `cc0-sound-sourcing`
+  (finding, vetting and crediting CC0 recordings without API keys). Measure A-weighted before
+  believing a raw centroid, build the engine tests' rules into the tool that writes the files,
+  and grep tests for hard-coded variant counts when a bank grows.
 - CPU while minimized: `ShowWindow(h, 6)`, sample `Process.TotalProcessorTime`, restore with
   `ShowWindow(h, 9)`. Log tick counts at pause and resume to prove the simulation did not jump.
 - Smoothness/interpolation: prove it numerically in an `App`-level test (the drawn position
@@ -308,6 +381,9 @@ Scripts: `references/windows-harnesses.md`.
   edits in the queue's "Agent files" section (by file; the later entry wins; the root
   `AGENTS.md` points at the queue files and says the queue is newer), go on with the code, and
   apply them later in one approval round (`agent-context-files`, Rules).
+  Patches sent in one parallel batch get one prompt each: some can apply while others time
+  out. Check the file's `git diff`, keep what applied if it is true, and list only the blocked
+  edits as pending.
   When the integration suite checks agent files (a new crate needs its own), the items that need
   them cannot pass the gates, so leave them uncommitted and make the approval round one patch:
   copy the working tree (`git ls-files --cached --others --exclude-standard`) to scratch, `git
@@ -322,7 +398,10 @@ Scripts: `references/windows-harnesses.md`.
   When applying them with the user present: draft each file in scratch and measure it first,
   then make each file one `patch` (one approval prompt per file). `write_file` on an agent file
   can keep refusing with a stale-read error even after a full `read_file`; a single large
-  `patch` goes through. Before cutting detail from an agent file, grep the docs it will point at
+  `patch` goes through. The same refusal hits any existing file read in a parallel batch or
+  with `limit`, and any file `git checkout` or a script rewrote since the read: for a
+  whole-file rewrite, `write_file` it to scratch under a new name and `cp` it over, or write it
+  with a terminal heredoc (`cat > path <<'EOF'`), then grep for the new content. Before cutting detail from an agent file, grep the docs it will point at
   for every number it drops, and add the missing ones there in the same commit.
 - Lint-enforcement items: list the sites with `lint-sites.sh '<warning text>' -- -W <lint>`,
   which needs no Cargo.toml change. The `[workspace.lints]` switch goes in last (loop step 3).
