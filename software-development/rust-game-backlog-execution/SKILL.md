@@ -155,6 +155,14 @@ from its parent, keeping the old series on a backup branch:
 - Finish with `git diff <old-tip> <new-tip>` empty, then move the branch
   (`git switch main && git reset --hard <new-tip>`); tell the user the backup branch name.
 
+## Pulling upstream into a queue branch
+When the user asks for main's updates while a queue branch is unmerged: `git fetch`, then merge
+(`git merge --no-ff --no-commit main`), not rebase: the work log and the asset list cite the
+branch's hashes. Resolve generated files by regenerating them (maps from recipes, textures
+from the generator, then pixel-compare and restore the unchanged ones), give main's glyphs,
+keys and names precedence where both sides added the same thing, and refresh the asset list in
+the commit after the merge. Gate the merged tree with `AGENT_SCOPE='*'` before committing it.
+
 ## Committing a finished working tree as several commits
 When several logical changes already sit uncommitted in one tree:
 - Order the commits so each stands alone: what others rely on first (a library split, a tool
@@ -255,6 +263,12 @@ Scripts: `references/windows-harnesses.md`.
   counts the mix. A running player's steps overlap everything every 0.15 s and sit centred
   (the listener follows the player): isolate other sources by standing still and turning the
   view. Leave the WAVs in scratch for the user to listen to; their ears still decide.
+- A user hearing "echo" or "long tails" in synthesised one-shots: measure each file first
+  (length, when it falls 40 and 60 dB below its loudest, how many strikes: a 6 dB rise within
+  10 ms above -24 dB). Heel-and-toe steps are two strikes, resonances cut off by the file's end
+  ring on, and a step every 0.15 s piles them up; the mixer is rarely the cause (check it clears
+  its buffer). Fix the generator (one strike, decays shorter than the file, refuse a sound not
+  silent at its end) and pin it with a manifest-wide test, seen failing on the old files.
 - CPU while minimized: `ShowWindow(h, 6)`, sample `Process.TotalProcessorTime`, restore with
   `ShowWindow(h, 9)`. Log tick counts at pause and resume to prove the simulation did not jump.
 - Smoothness/interpolation: prove it numerically in an `App`-level test (the drawn position
