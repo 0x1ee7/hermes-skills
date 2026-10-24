@@ -301,8 +301,15 @@ Scripts: `references/windows-harnesses.md`.
   new files and save `git diff` beside the plan (`.hermes/plans/*.patch`; `git apply --check`
   it in the repo). Run the suite in the copy with its own `CARGO_TARGET_DIR` (a cold build, ~4
   min) and mutate the copy's new agent file once (drop a dependency) to see the check bite.
-  Measure the Hermes budget there too: root plus each boundary file under 20,000 characters;
+  Measure the Hermes budget there too: root plus each boundary file under the cap every path
+  gets (`hermes config get context_file_max_chars`: 40,000 here; 20,000 when unset, which is
+  what `delegate_task` subagents get even on a 1M-token model);
   make room by cutting restatements (a sentence repeating a rule) before others' facts.
+  When applying them with the user present: draft each file in scratch and measure it first,
+  then make each file one `patch` (one approval prompt per file). `write_file` on an agent file
+  can keep refusing with a stale-read error even after a full `read_file`; a single large
+  `patch` goes through. Before cutting detail from an agent file, grep the docs it will point at
+  for every number it drops, and add the missing ones there in the same commit.
 - Lint-enforcement items: list the sites with `lint-sites.sh '<warning text>' -- -W <lint>`,
   which needs no Cargo.toml change. The `[workspace.lints]` switch goes in last (loop step 3).
 - Bulk `missing_docs` fixes: drive one script from the `path:line|source` list. Insert bottom-up,

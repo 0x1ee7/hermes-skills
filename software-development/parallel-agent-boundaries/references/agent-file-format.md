@@ -125,4 +125,5 @@ followed by a game task.
 Use short, plain sentences. Every fact that a test checks names the test, and sizes and counts
 come from commands. Refer to the repo's rules by number instead of restating them. Leave out
 anything an agent from another boundary does not need. Keep the root file plus the largest
-boundary file under 20,000 characters, the most Hermes loads in full for one folder.
+boundary file under the cap Hermes applies on every path: `context_file_max_chars` from its
+config.yaml (this user: 40,000), else 20,000, what subagents always get.

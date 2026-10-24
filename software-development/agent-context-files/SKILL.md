@@ -43,8 +43,11 @@ any folder actually receives, with Hermes's own loader and injection scanner.
   4. `.cursorrules` and `.cursor/rules/*.mdc` in the cwd only.
 
   So one `AGENTS.md` anywhere on the chain shadows every `CLAUDE.md`. Each file, and the merged
-  chain, is capped at max(20,000 characters, 6% of the model's context in characters); beyond
-  that the middle is cut. If the injection scanner matches anything in a project file, the
+  chain, is capped at `context_file_max_chars` from config.yaml when set (it wins on every
+  path), else at max(20,000 characters, 6% of the model's window in characters): 240,000 for a
+  1M-token window, but always 20,000 for `delegate_task` subagents, whose prompt builder passes
+  no window. Subdirectory hints have their own fixed 32,000 cap. Beyond the cap the middle is
+  cut. If the injection scanner matches anything in a project file, the
   whole file is replaced by one `[BLOCKED: ...] Content not loaded.` line. Front matter is
   stripped from `.hermes.md` only, so an `AGENTS.md` front matter reaches the model as text.
   During a session, when a tool call touches files in a sub-folder that has its own
@@ -72,7 +75,8 @@ any folder actually receives, with Hermes's own loader and injection scanner.
    Use visible text, not an HTML comment, so a person who opens the file sees where the rules
    went.
 3. Per-folder guides: an `AGENTS.md` and a shim in each folder an agent may be started in or
-   work in. Keep the root file plus the largest folder file under 20,000 characters.
+   work in. Keep the root file plus the largest folder file under the cap that applies to
+   every path: `hermes config get context_file_max_chars` (this user: 40,000), else 20,000.
 4. Draft each file as `*.draft.md` (in `.hermes/` or scratch), then run
    `check_context_files.py scan` over the drafts. Hermes guards writes to `AGENTS.md`,
    `CLAUDE.md`, `.cursorrules`, `SOUL.md` and the project's `.hermes/` tree: a write may wait
