@@ -172,12 +172,36 @@ When several logical changes already sit uncommitted in one tree:
   stage script (`stage.py <commit> <tree>`, asserted replacements) and run it in the worktree
   before gating that tree. The closing stage takes the item's commit hashes as arguments: they
   exist only once the earlier commits are made.
+- Build intermediate versions backwards from the finished file (remove what later commits add)
+  or forwards from HEAD, and pin the end: `same(path, finished)` at the stage where a file
+  becomes final, so a typo in an intermediate edit fails there, not in review.
+- Dry-run the whole series before the first commit: every stage in order in the worktree, no
+  gates, then `diff -rq --exclude=.git --exclude=target` against the main tree (only the files
+  the series adds on purpose may differ), then `git checkout -- . && git clean -fd` and run it
+  for real. Line counts in agent files (reading order) come out right when the stage script
+  recomputes them from the worktree's files instead of carrying literals.
+- Finish by `git reset --mixed <tip>` in the main tree: `git status` must list only files the
+  series changed on purpose (agent files applied there, queue and plan); restore exactly those
+  from the tip. A closing commit with a wrong line can be fixed with `--amend` even while the
+  next stage's files sit in the worktree: stage only the corrected file.
 - Give every worktree a `CARGO_TARGET_DIR` of its own. Sharing the main target folder saves the
   dependency builds but corrupts it: cargo names workspace crates' artifacts by their path
   relative to the workspace root, so the worktree's build replaces the main tree's, cargo still
   counts them fresh, and test binaries keep the worktree's `env!("CARGO_MANIFEST_DIR")`. Once
   the worktree is removed, tests that read files through it fail ("reading <worktree>/...").
   If it happened: `cargo clean -p <each workspace member>` in the main tree, then gate again.
+  One scratch target shared by several worktrees fails the same way, silently: worktrees
+  checked out before the first build look older than its artifacts, so the second gates the
+  first one's binaries against the first one's files (here: 79 demo tests reported for a tree
+  holding 91). Run them one after the other with `cargo clean -p <every member>` before each
+  (dependencies stay built), or give each its own target.
+- A way that rewrites nothing: build every commit as an object in a scratch index
+  (`GIT_INDEX_FILE=<scratch>/index git read-tree HEAD`, `git add`/`update-index`, `git
+  commit-tree $(git write-tree) -p <parent> -F <msg>`), gate each in `git worktree add --detach
+  <dir> <sha>`, then move the branch once (`git update-ref refs/heads/main <tip> <old>`) and
+  sync the real index with `git reset -q`; the working tree keeps what was left out. Check the
+  tip against the working tree with a scratch index too (`read-tree <tip>`, `update-index
+  --refresh`, `git diff --stat`): a plain `git diff <tip>` shows untracked files as deleted.
 - Copy files into a worktree with a fresh mtime (`cp`, Python `shutil.copy`), never
   `shutil.copy2` or `cp -p`: an older mtime than the target folder's last build makes cargo
   take the crate as built, and the gate tests the previous commit's code. The sign: a test
@@ -292,7 +316,8 @@ Scripts: `references/windows-harnesses.md`.
   full read may not), and a refused write leaves the old file in place while later gates still
   pass. Prefer `patch` for existing files; for a scratch script or JSON you rewrite, write a new
   file name. Never launch a script in the same batch as its rewrite: a refused rewrite runs the
-  old version. Grep for the new content before building, capturing or running.
+  old version (a commit-message or notes file too: the commit then carries the old text). Grep
+  for the new content before building, capturing, running or committing.
 - cargo-deny: `cargo deny init` takes no path and writes `deny.toml` in the current directory;
   build the licence allow-list from `cargo deny list -f tsv -l license` (crates offering
   `X OR MIT` pass through MIT). `allow-wildcard-paths` only covers unpublishable crates; give
