@@ -38,6 +38,7 @@ System Pythons may lack numpy/cv2. Make a throwaway venv in the Hermes scratch d
 6. Cross-check pitch independently: a horizontal circle (drum top, tire) has minor/major ~= sin(depression of its view ray). Measure it in pixels.
 7. `scale IMG --obj u,v_foot,v_head,1.8 ...` (several characters) -> camera height, focus distance D, ground footprint, ortho half-size. Report the spread.
 8. Round to designer-plausible values (e.g. vFOV 17, pitch 45, yaw 45) and confirm the rounded camera reprojects the edges no worse than the raw fit.
+9. Deliver in one pass: projection type with its evidence, vFOV AND hFOV (engines disagree on the axis), pitch/yaw/roll with 90% CIs, D in metres and as a multiple of character height, the ortho half-height alternative, engine snippets, the stated assumptions (centred principal point, assumed character height), and the overlay path as proof.
 
 ## Formulas (principal point p = image centre)
 

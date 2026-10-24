@@ -133,7 +133,8 @@ Ending a session ("finalize, new work starts from a new context"):
   origin/main...main` (behind must be 0; never force). Push existing tags only by name.
 - Watch the CI run of the push (`gh run list --branch main --limit 1`, then `gh run watch <id>
   --exit-status` in the background) and report its result: it is the only check of the
-  software-rendered path.
+  software-rendered path. When git needs a `safe.directory` wrapper (exFAT), `gh` run inside
+  the repo fails with "dubious ownership": pass `--repo <owner>/<name>` instead.
 
 Tagging a milestone when asked: match the existing tags (`git for-each-ref refs/tags
 --format='%(refname:short) %(objecttype)'`), prefer an annotated tag whose message lists what the
