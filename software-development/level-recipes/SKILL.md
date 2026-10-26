@@ -8,7 +8,7 @@ platforms: [windows, linux, macos]
 metadata:
   hermes:
     tags: [level-design, procedural, tile-map, iso-engine, recipes, seasons, python]
-    related_skills: [blender-lowpoly-models, rust-game-backlog-execution]
+    related_skills: [blender-lowpoly-models, rust-game-backlog-execution, level-from-reference-image]
 ---
 
 # Generating levels from recipes
