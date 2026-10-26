@@ -19,7 +19,7 @@ import time
 import zlib
 from pathlib import Path
 
-REPO = Path("D:/dev/iso-engine")
+REPO = Path(os.environ.get("ISO_REPO", "C:/Users/0x1de/dev/iso-engine"))
 S = Path(os.environ.get("CAPTURE_SCRATCH", "C:/temp/capture"))
 ASSETS = S / "assets"
 

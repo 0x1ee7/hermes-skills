@@ -52,21 +52,34 @@ def frontage(c, keys, start, end, front, facing, gap=0.6):
 ```
 `front` is the line the fronts stand on (one tile back from the road keeps a pavement).
 
-## Structures (tile-built, enterable buildings)
-- `structure(x, y, plan, name=None, roof="gable", colour="red", notes=())`: `plan` is one list
-  of rows per storey, ground first, in the map's own characters `# = . + c p ^ < >`. A space
-  keeps the ground on the ground storey and is open air above. Upper storeys become
-  `[level N at X Y]` blocks; blank rows round a block are trimmed and its origin moved, because
-  the game reads them as padding.
-- Named: a `[buildings]` entry over the ground storey's rectangle, eaves (0.3 m) that models
-  keep clear of, no scatter a tile further out, and a door with a path for every floor tile on
-  the rectangle's edge (corners aside). Lay roads first: each door path must reach one.
-- Unnamed: freestanding walls, an outside stair. Register an outside stair's approach tile
-  with `c.path_from("label", (x, y))` so the reachability check covers it.
-- Flights: a floor at the foot, a floor on the storey above beyond the head, an open stairwell,
-  and no tall wall under the landing on the flight's own storey. The game refuses that wall
-  at load: walkers stop a step short of the top. Piers for an outside landing go under its
-  low walls, never under the landing itself.
+## Buildings of walls on tile edges (enterable buildings)
+Walls, windows and doors stand on the edges between tiles (`[walls N at X Y]` blocks, a
+double-resolution grid: even rows corners and north edges `- = 0 /`, odd rows west edges
+`| = 0 /` round the tiles' middles). Tile walls (`#`, `=`, `0`, `/` in a grid) are gone.
+- `plan(x, y, storeys, name, roof, colour, material, wall_colour, notes)`: a building drawn by
+  hand, one list of rows per storey in the double grid, floors (`. + & c p ^ < >`) in the
+  tiles' middles. Named: a `[buildings]` entry over its ground floors, eaves (0.3 m) models
+  keep clear of, no scatter a tile further, and a path from every door on its outline to the
+  nearest road. Unnamed: walls alone (a yard, a garden wall) or an outside stair; register an
+  outside stair's approach with `c.path_from("label", (x, y))`.
+- `building(x, y, w, h, name, storeys, roof, colour, material, wall_colour, front, floor,
+  rooms, seed, door)`: generated (`generate_building`): rooms by binary cuts with a door in
+  each, a front door facing `front` (`door` tiles along it), windows, flights of three steps
+  along the west or east wall. Give it a `seed` so changing one building leaves the level's
+  other random choices alone.
+- `building_for(model_key, x, y, facing, scale=1.0)`: a building on the lot a building model
+  would take there, in the model's style (`BUILDING_STYLES`; winter: `WINTER_WALLS`, snow
+  roofs). Ask `building_fits` first; a frontage helper calls these instead of `fits`/`place`.
+- `windmill(x, y, facing, door)`: a 4x4 tower of walls with the `building.windmill_cap` model
+  (cap, sails, tail pole) on its walls' tops.
+- `below_plan(x, y, rows, name)`: a storey under the ground with walls on edges (relief maps).
+- `later_paths()` ... `lay_paths()` round a crowded block: door paths are laid once every
+  building stands, or a path runs across the next lot and that building no longer fits.
+- Flights: a floor at the foot, a floor on the storey above beyond the head, an open
+  stairwell; no wall on the edge between a flight and its foot or landing (the game refuses
+  it). On a relief map a flight on the ground storey needs ground level at 0 m under it.
+- `structure(x, y, plan)` is left for floors, props and flights without walls (a band of
+  grounds).
 - Buildings open (roof, upper storeys, near walls) only while the player is inside one; behind
   a building the see-through circle shows the player instead. A test lane behind buildings
   exercises the circle, not an opening building.

@@ -114,6 +114,11 @@ any folder actually receives, with Hermes's own loader and injection scanner.
   not the entries. Then put "Applied on <date>; nothing here is pending" at the top of the
   queue section and update the handoff's and the plan's next steps. Under the "queue is newer"
   rule, a list without that line gets applied again, stale entries included.
+- Mechanics of such a round, with the user present: one script builds every draft from today's
+  files by asserted replacements, filling line counts from the files (`@@path@@` placeholders)
+  and re-wrapping the list items it changed; `scan` the drafts and `git diff --no-index` each
+  against its file; then one terminal command copies them all over and `cmp`s each (one
+  approval for the round); then `load --expect` per folder and the repo's agent-file checks.
 - Size each draft together with the root file before writing (`check_context_files.py load`
   after, `--expect` per folder). The boundary that collected the most entries outgrows the
   cap first: shorten by pointing at the docs (a design doc, the other boundary's Provides)

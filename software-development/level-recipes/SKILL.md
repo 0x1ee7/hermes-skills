@@ -1,7 +1,7 @@
 ---
 name: level-recipes
 description: "Use when generating tile-map levels from a model library."
-version: 1.0.0
+version: 1.0.1
 author: Hermes Agent
 license: MIT
 platforms: [windows, linux, macos]
@@ -46,8 +46,10 @@ Then `cargo run -- <level>`; the demo's tests cover every `level.*` key in the m
    Done when `scripts/debug_level.py <recipe> summer 1` prints `check: ok`.
 3. Use the kit, not hand-computed coordinates: `place(..., door=True)` lays door paths,
    `place_any(key, c.spots(area, facing))` puts clutter wherever it fits, a `frontage` helper
-   (see references/kit-api.md) lines a street with buildings picked at random. Buildings to
-   walk into, with storeys and stairs, are `structure(...)` plans (references/kit-api.md).
+   (see references/kit-api.md) lines a street with buildings picked at random. Buildings to walk
+   into are built of walls on tile edges: `building_for(model, x, y, facing)` on a model's lot
+   in its style, `building(...)` generated on a lot, `plan(...)` drawn by hand
+   (references/kit-api.md).
 4. Run it in winter too (`debug_level.py <recipe> winter 1`); a model with no winter decision
    stops the build: add it to `WINTER` (its winter form, or None to put it away) or `NEUTRAL`.
 5. `python3 tools/maps/build_levels.py`, add the `level.<name>` data key it asks for, capture
@@ -75,6 +77,27 @@ Then `cargo run -- <level>`; the demo's tests cover every `level.*` key in the m
 - Tile-granular overlap tests reject neighbours that are 5 cm apart; keep the exact test.
 - A full-height wall under a flight's landing (its own storey) stops walkers short of the top;
   the game refuses such a map, so leave the tile under a landing open.
+- The text map has one glyph namespace: floors, stairs, props, the spawn and scatter letters
+  all share it (walls have their own, on edges), and the kit's glyph table mirrors the parser. Check a new symbol
+  against both before a feature's plan fixes it; a plan can hand a window `|` that is already
+  the metal floor. List the glyphs in use by scanning every map's grid and `[level ...]` rows
+  (skip `//` lines and the other sections); scatter markers are letters, so the free symbols
+  are punctuation and digits. Check the comment syntax too: a row starting with `//` is a
+  comment, so a `/` glyph silently drops any row that begins with two of them. Pick another
+  glyph, or make the kit refuse to write such a row (the parser cannot tell it from a comment).
+- A new floor or prop glyph needs an entry in the kit's `BUILT` table (and `BUILT_SOLID` when
+  walkers cannot cross it), or `structure()` and `plan()` reject it. Every reach check crosses
+  an edge only through a door (`crosses`, and under the ground `edge_between(-1, ...)`).
+- Buildings of walls on model lots: size the lot to the model's base (`lot_of` rounds it
+  round its middle), not to every tile under it, or roofs reach into the gaps props filled
+  between models; put the front door where the model's middle meets its front, where its door
+  path ran, or props laid beside that path stand in the new door's way. Walls need a tile
+  between buildings where models stood closer: nudge or shrink (0.9, 0.8) in a dense block.
+- Trees, bushes and rocks on a tile beside a wall on an edge reach through it; the kit keeps
+  solid scatter off those tiles. Converting a hand-painted map, clear them there too.
+- Prove a generator by a sweep over sizes, storeys, fronts and seeds with an oracle of its
+  own that reads the generated rows (a door beside a flight), not only the generator's checks:
+  757 of 9216 generated buildings had a front door onto a flight's side before the fix.
 - `distance_to(...)` dicts must be iterated sorted, never as sets, or output changes per run.
 - `why_not.py` runs the whole recipe, so it also reports models placed after the failure.
 - Windows: foreground timeouts over 600 s turn into background jobs that lose exported

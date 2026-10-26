@@ -1,7 +1,7 @@
 ---
 name: rust-game-backlog-execution
 description: "Use when implementing a Rust engine backlog item by item."
-version: 1.3.0
+version: 1.3.1
 author: Hermes Agent
 license: MIT
 platforms: [windows, linux, macos]
@@ -26,12 +26,28 @@ desktop, and the pitfalls that cost time.
 - `scripts/gates.sh`: fmt, clippy, tests, optional `smoke` and `doc`; one summary line per gate,
   exit 1 at the first red one. Smoke command and log patterns come from `SMOKE_*` env vars.
 - `scripts/mutate.py`: mutation checks from a JSON list (path, exact old text, new text, test
-  that must fail); restores byte for byte, then runs the crate's suite.
+  that must fail); restores byte for byte, then runs the crate's suite. One test filter per
+  entry: a space-separated list in `test` matches no test and reports the mutation missed.
+  Write entries after `cargo fmt`: rustfmt rewraps long conditions and blocks, and an entry
+  written against the unformatted text no longer matches.
+- `scripts/pymutate.py`: the same for Python tools (a level kit, a generator) checked by a
+  scratch script that exits 1 on failure.
+- `scripts/allgates.sh`: the iso-engine's whole gate list on top of `gates.sh` (fmt, clippy,
+  tests, smoke, doc, the integration suite with `AGENT_SCOPE='*'`, the generators' and the asset
+  list's `--check`), one summary line each; `nosmoke` and `noassets` skip parts. Copy it beside
+  `gates.sh`, and never chain it into `&&` through a pipe.
+- `scripts/prep-probe.py`: a scratch asset root whose `level.probe` puts the player on any tile
+  of any storey (`--storey N` places the spawn in that storey's block), for
+  `game-window-control`'s `launch --env ISO_ASSET_ROOT=<root> -- demo.exe probe` and its steps.
 - `scripts/lint-sites.sh`: every site of one warning as `path:line|source line`.
+- `scripts/snap.sh`, `scripts/commit_snapshots.py`: keep gated work as tree snapshots until the
+  user's look, then turn them into commits ("Committing a finished working tree as several
+  commits").
 - `scripts/ab.sh`: times a before and an after binary, alternating runs, and prints the means.
 - `references/engine-recipes.md`: GPU-free test recipes; API notes for wgpu 30, winit 0.30,
-  bevy_ecs 0.20, gltf and cpal 0.18; fixed-timestep, texture and skinned-import recipes; rules for
-  see-through and cutaway features (what may fade, the see-through circle).
+  bevy_ecs 0.20, gltf and cpal 0.18; fixed-timestep, texture, floor-shadow and skinned-import
+  recipes. Buildings in an isometric view (walls on edges, the cutaway, the see-through circle,
+  the view field, doors, windows): the skill `isometric-building-interiors`.
 - `references/windows-harnesses.md`: window capture, pixel diff, CPU-while-minimized scripts.
 - `scripts/capture-keys.ps1`: start the game, play keys into its own window, capture at named
   steps; the same step string replays into a before and an after build.
@@ -46,19 +62,33 @@ desktop, and the pitfalls that cost time.
    dubious ownership, then `export PATH="$SCRATCH:$PATH" LOGS="$SCRATCH"`. Shell functions never
    persist between terminal calls, and exported variables can be lost too (see Pitfalls).
 2. Make the plan current, and track it. When the backlog follows a plan written before recent
-   commits, check its assumptions against the repo (moved modules, renamed docs, new callers
-   such as an integration suite) and fix them in the plan, under a short "Changes since this
-   plan was written" section. This user wants the plan committed (`.hermes/plans/`, in the
-   queue's first commit) with a Progress section that every commit of the queue updates: what
-   the commit finished, what comes next, what waits for a decision or an approval.
+   commits, check its assumptions against the repo and fix them in the plan, under a short
+   "Changes since this plan was written" section. First list what postdates the plan: its
+   commit date (`git log --format='%h %ad' -- <plan>`) against each subsystem's first commit
+   (`git log --diff-filter=A --format='%h %ad' -- <file>`). Then check moved modules, renamed
+   docs and new callers (an integration suite); every name, glyph or key the plan reserves
+   (another feature may hold it now, the engine's key enum may lack it, a binding may use it);
+   and the granularity of what the plan writes: a per-entity value planned per tile cannot vary
+   inside geometry added since as merged meshes (terrain chunks, one roof mesh per building).
+   Do this before asking step 3's questions, because drift that changes the design is one of
+   them. This user wants the plan committed (`.hermes/plans/`, in the queue's first commit)
+   with a Progress section that every commit of the queue updates: what the commit finished,
+   what comes next, what waits for a decision or an approval.
 3. Get every approval the run will need while the user is there: window captures (PowerShell
    with `-ExecutionPolicy Bypass`), writes to `AGENTS.md`, deletions. A prompt that comes while
    they are away times out, and a timed-out action must not be retried or done another way.
+   Activity in the chat does not prove the approval dialog was seen: this user can answer a
+   message while the prompt sits behind it, so ask at the start of the run, not at the item
+   that needs the file.
    When a plan carries open questions (remove dead code or keep it, archive or not), ask them
    all in one message before the first commit, with a recommendation each, and ask for the
    agent-file approval in the same message: this user answers in one line ("1 yes, 2 yes") and
-   wants the run to finish without stopping again. Record the blanket approval in the queue's
-   "Agent files" section.
+   wants the run to finish without stopping again. Number step 2's design drift among them
+   (the recommendation, and what the alternative leaves out), ground each recommended number in
+   a figure worked out from the code (the ground the default camera shows, a speed, a size) so
+   it can be accepted without measuring, and end with the run order: items that change nothing
+   on screen commit once green, visible ones wait for a look. Record the blanket approval in
+   the queue's "Agent files" section.
 4. Run `gates.sh smoke doc` and record the test count as the baseline.
 
 ## Loop per item
@@ -89,7 +119,10 @@ desktop, and the pitfalls that cost time.
    easy to review, bisect and revert: a refactor apart from the feature that needs it; engine
    code apart from game code; a tool change apart from the content it later produces; generated
    assets together with the generator change and manifest keys that produced them; content
-   placement (maps, levels) apart from the assets; docs with the change they describe. Every
+   placement (maps, levels) apart from the assets; docs with the change they describe. Gate and
+   commit each part before starting the next: editing part 2 in the same tree turns two
+   reviewable commits into one, and starting it while the part 1 gate still runs leaves that
+   gate testing a tree that no longer exists. Every
    commit must build and pass the gates on its own (the next commit must not be needed to make it
    compile, e.g. no item unused until a later commit, which `-D warnings` rejects as dead code).
    The item's last commit ticks it and adds the work-log line. Chain each one so a red gate never
@@ -111,7 +144,10 @@ desktop, and the pitfalls that cost time.
    section (Setup step 2).
    While the user is reviewing on screen (sending screenshots, wanting to run the game), leave
    visual changes uncommitted until they approve: say where to look (level, spot, keys) and how
-   to undo (`git restore <files>`). Commands for them to run: try them first in the same shell,
+   to undo (`git restore <files>`). A state-only item (a resource, a computed set, a parsed
+   table) has nothing to look at: do not add its key to README or hand over a level until a
+   system reads it, or the user asks "which map should I test". Either wire the first consumer
+   in the same run or say plainly that nothing on screen changes yet. Commands for them to run: try them first in the same shell,
    give the Git Bash and the PowerShell form, and end with the restore step. The same holds for
    anything they can hear: finish the work, run every gate, leave it uncommitted with a
    listening preview in scratch, and draft the commit messages (a scratch `commits.txt`) so
@@ -134,6 +170,14 @@ desktop, and the pitfalls that cost time.
    values (drawn positions, the camera eye) in a throwaway probe to find what moves at rest. Then the fix removes the real cause, and the work log can say it was the only one.
    The same switch answers "is X still needed?": disable X with a one-line edit, run the suite,
    report the failing tests by name (they are what X provides), then restore.
+9. Retiring an old representation (tile walls for walls on edges): make the parser refuse the
+   old form for a moment and run the suite; the failing tests are the whole list to convert
+   (here 54). Convert the tests of general behaviour first, in a commit of their own, while the
+   old code still stands and stays green, and mutate what their negative assertions guard,
+   since a new map can leave them passing vacuously. Then delete the old code with its own
+   tests. The conversion turns up behaviour that leaned on the old form without saying so:
+   here roofs that only lit up because wall tiles were "seen", and walls under the ground that
+   lost their gap under the crust. Fix each test first, before the removal.
 
 ## Finish
 Report one line per commit (sha, ID, change), a "not verified" list, any uncommitted state with
@@ -238,6 +282,11 @@ When the user asks to merge an agent's branch into main and push:
 
 ## Committing a finished working tree as several commits
 When several logical changes already sit uncommitted in one tree:
+- When the earlier commit differs from the finished tree in a few files only, stage it in
+  place: back the finished files up, write the earlier versions by script (HEAD plus asserted
+  edits, or the finished file minus asserted edits), gate in the main tree (an incremental
+  build, minutes faster than a fresh worktree), commit, restore the backup, gate the rest and
+  commit it.
 - Order the commits so each stands alone: what others rely on first (a library split, a tool
   fix), then the change that needs it. Things that need each other (a test suite and the files
   it checks) go in one commit.
@@ -283,6 +332,18 @@ When several logical changes already sit uncommitted in one tree:
   sync the real index with `git reset -q`; the working tree keeps what was left out. Check the
   tip against the working tree with a scratch index too (`read-tree <tip>`, `update-index
   --refresh`, `git diff --stat`): a plain `git diff <tip>` shows untracked files as deleted.
+- Work that waits for the user's look: snapshot it piece by piece instead of splitting it at
+  the end. After a piece's gates pass, put its message in `<scratch>/msgs/<label>.txt` and
+  record the whole working tree as a tree object (`SNAP_DIR=<scratch> scripts/snap.sh
+  <label>`; the real index is untouched); keep working on top, so snapshots are cumulative and
+  taken in order. A work-log line citing a commit not made yet carries the token
+  `@@<label>@@`. After the look, `python scripts/commit_snapshots.py --snaps <scratch> --tokens
+  <queue file> [--asset-list docs/asset-list.md --asset-cmd "python3 tools/list_assets.py"
+  --asset-from <the asset item's closing label>] --dry-run` builds the chain on
+  `refs/heads/snapshots-dryrun`, filling in the tokens and the asset list (both cite commits
+  that exist only then). Check its tip against the working tree (only those two files may
+  differ), delete the ref, and run it without `--dry-run`: it moves the branch, resets the
+  index and writes the two files, so `git status` comes out clean.
 - Copy files into a worktree with a fresh mtime (`cp`, Python `shutil.copy`), never
   `shutil.copy2` or `cp -p`: an older mtime than the target folder's last build makes cargo
   take the crate as built, and the gate tests the previous commit's code. The sign: a test
@@ -376,6 +437,16 @@ Scripts: `references/windows-harnesses.md`.
   Check `git diff --cached --stat` before committing and build each commit's index explicitly
   (`git reset -q`, then `git add <files>` or `update-index` for in-between versions), never on
   top of whatever happens to be staged.
+- Repos whose checks scan source by cutting at the first `#[cfg(test)]`: keep test-only module
+  declarations below every public item. A `#[cfg(test)] mod x;` above `pub struct`/`pub use`
+  hides the rest of the file from the scan, and the contract check fails with every public item
+  "not a public item". Prefer wiring the first caller; when the module must stay test-only for
+  one commit, declare it last.
+- Windows gates: tests that write `std::env::temp_dir()` can fail with `PermissionDenied` when
+  the command runs binaries built under the workspace inside a sandbox that allows writes only
+  there. Point `TMP` and `TEMP` at a folder inside the workspace (`<repo>/target/tmp`) for the
+  gate run; do not edit or skip the tests. Copying the failing test binary outside the
+  workspace and running it there confirms the cause.
 - Docs behind an approval gate (`AGENTS.md`): when the prompt times out, don't retry it or
   write the file another way. This user freezes agent files for a run: list the exact pending
   edits in the queue's "Agent files" section (by file; the later entry wins; the root
@@ -434,8 +505,14 @@ Scripts: `references/windows-harnesses.md`.
   - `manual_pattern_char_comparison`: use `find(['=', '.'])`.
   - `needless_update`: after removing struct fields, a `..Self::default()` update may name
     every remaining field; drop the update.
-- Python `Path.write_text` writes CRLF on Windows; generators should use
-  `write_bytes(text.encode())` so regenerated assets don't diff on every line.
+- Python `Path.write_text` writes CRLF on Windows; any script that rewrites a tracked file
+  (a generator, an edit script) must `write_bytes` so only the intended lines change. A
+  generator patched with `write_text` shows every line as changed: normalize CRLF to LF and
+  amend before committing.
+- Regenerating placeholder textures under a different Pillow version can rewrite every PNG's
+  bytes while the pixels stay identical. Pixel-compare each changed file against
+  `git show HEAD:<path>` (PIL, `ImageChops.difference`), restore the byte-only changes, and
+  keep only the new textures, or the commit is binary churn across the whole asset folder.
 - Python edit scripts: write text that holds backslashes (ASCII art, regexes, Windows paths) as
   raw strings (`r"""..."""`): in a normal string a `\` at the end of a line silently joins it
   to the next line.
@@ -456,6 +533,10 @@ Scripts: `references/windows-harnesses.md`.
 - A mutation check only counts when the test can see the mutation: one that changes behaviour
   outside the test's setup survives without proving anything. Mutate in the shape of the bug
   class the test guards, and name which other test covers what this one cannot.
+- Content mutations (textures, maps) count only when the test reads the file mutated: a test
+  helper opening `CARGO_MANIFEST_DIR/../../assets` ignores `ISO_ASSET_ROOT`, so mutating a
+  scratch copy reports every mutation "missed". Mutate the repo's file in place from a
+  byte-for-byte backup, restore it after each run, and `cmp` every file at the end.
 - A non-default GPU path (another fade style, a debug view) is still worth one smoke run: flip
   the default in source with an asserted replace, run the smoke command, restore from a copy,
   and check `git diff` is empty for that file. Draw counts in the exit log show the path ran.

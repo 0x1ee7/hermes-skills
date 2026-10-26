@@ -93,48 +93,12 @@ writing calls.
   `update`. Tests that count entities (spawn and despawn leaks) therefore take their baseline
   after one warm-up update and compare resources separately. Otherwise every world shows one
   phantom entity.
+- `Query<&mut T>` iterates as `Mut<T>` alone; add `Entity` to the query
+  (`Query<(Entity, &mut T)>`) when the system needs ids, and its `get_mut` then returns
+  `(Entity, Mut<T>)`. A second query to fetch the entity conflicts with the first.
 
-## See-through and cutaway features (isometric visibility)
+## Floor shadows
 
-- Open or fade only what stands between the camera and the player. A cause that ignores the
-  camera (a cone in the way the player faces) makes walls the player walks up to see-through and
-  shows what lies behind them. Pin it: a wall a few metres ahead of the player stays solid, with
-  no circle in it, in the isometric view and in third person.
-- Prefer a screen-space see-through circle to fading whole occluders. Fading a whole wall, roof
-  or storey to about 0.3 opens far more than hides the player, and stacked translucent walls make
-  large patchy shapes. The circle is a resource (centre at the chest, radius, strength) that the
-  game eases and the renderer turns into NDC once per frame; the shaders open the flagged draws
-  by screen distance alone, with a soft edge.
-- Decide what the circle opens on the CPU, once a frame for the whole frame, for whole things,
-  and pass it as a per-vertex or per-instance flag. Never compare each fragment's depth with the
-  centre's: one plane through the chest slices any surface passing beside the player (a
-  straight diagonal through the circle), and with a camera looking down, the tops of walls
-  behind the player land in front of that plane.
-- Judge boxes, not points: a box opens while the line of sight to the camera from the circle's
-  centre, or from points on rings round it (0.3 and 0.6 of the radius, at the centre's depth,
-  along the camera's right and screen-up), enters it from outside (slab test; along `-forward`
-  for an orthographic camera, to the eye for a perspective one), or while its footprint lies
-  wholly in front of the centre on the ground plane. One point per draw fails both ways: a bus
-  whose middle lies behind still hides the player with one end, and a building beside the
-  player whose middle is in front opens a hole beside it. A line that starts inside a box counts
-  for nothing (eaves, a crown overhead). Quick reject: when the centre's line misses the box
-  grown by the outer ring's reach in every axis, every ring line misses.
-- Tile walls built from per-face quads need groups: judged quad by quad, a wall running past the
-  player opens face by face with straight edges at tile boundaries, and some faces open where
-  the player is not hidden at all. Put every wall tile in the group of its straight row piece
-  and of its column piece (tiles contiguous along the line and stacked over storeys, two or
-  more along it); a group opens whole by the box round its members, a tile opens with either
-  group. A straight piece is convex, so if any of it hides part of the circle, the player lies
-  behind every face of it the camera sees: opening it whole never opens a wall the player
-  stands in front of. Never group a whole building or an L: the parts behind the player open
-  too. Three follow-ups the captures showed: a piece every tile of which runs on further
-  across it is a thick wall's thickness, not a wall (no group, or it opens alone and leaves a
-  hole in the wall's top); build the side of a tile against a neighbour in a group it is not
-  in (normally skipped as hidden), or a wall left standing beside an opened corner shows its
-  hollow inside; and draw ground under every wall tile, or an opened wall shows the empty
-  background through its footprint.
-- Keep "opens" consistent across kinds: if lone things (a roof) open for lying wholly in front,
-  groups must too, or the roof opens and the walls under it stay, which reads as a hollow box.
 - Blob shadows (soft translucent floor quads at one height) must not write depth: two that
   overlap tie on depth, rounding picks the winner per pixel, and the streaks reshuffle whenever
   the camera moves by a hair ("stuttering" shadows). Without depth writes plain alpha blending
@@ -147,29 +111,11 @@ writing calls.
   mirror of the fixed-function blend (factors, ops, write mask) fed the real target states.
 - A write mask and a "keep" blend component guarding the same channel are one guard twice: a
   mutation of either survives. Keep the mask and make the component a plain replace.
-- Open buildings (cutaway) only while the player is inside one. A proximity rule ("open the
-  building within a few metres that stands between the player and the camera") flips buildings
-  open as the player walks past them, for example up an outside stair beside one; outside, the
-  circle shows the player through.
-- Let the circle decide on its own: rays from the chest and the head to the eye against the
-  occluders' boxes (slab test), never "something has faded". Skip parts a cutaway already took
-  away.
-- Keep whole-part fades for the cutaway alone (building parts eased to 0 or 1); one fader eases
-  them and writes tint alpha only when it changes.
-- Mark occluders see-through through a component requirement (`#[require(SeeThrough)]`), so
-  every spawn path gets it.
-- What the character itself can see (a view field through doors and windows) is a separate
-  system: it hides or darkens what lies out of sight, and never fades a wall.
-- Tests: the circle opens while the hiding box keeps tint alpha 1 (give the box the fade
-  component, so the old whole-object fade fails red); one occluder kind per fresh app when
-  switches decide by kind; a part the cutaway hid does not open the circle; a building stays
-  shut while the player stands outside it; one surface opens alike on both sides of the
-  circle's depth (a Rust mirror of the shader's opening function); a wall behind the player
-  stays shut however high it reaches. Let eased values land (about a second at 60 Hz) before
-  asserting 1.0. Mutate the in-front test into a 3D depth test: the height case must fail.
-  For groups: build test walls from blocks (four sides and a top, the way the game spawns
-  them) and check a wall in front of the player opens whole, a wall running past it whole or
-  not at all, a corner block opens with either wall, and a thing beside the player stays.
+
+## Isometric buildings
+
+Walls on tile edges, the cutaway, the see-through circle, the view field, doors and
+windows of glass, with their tests and captures: the skill `isometric-building-interiors`.
 
 ## Fixed timestep and interpolation
 

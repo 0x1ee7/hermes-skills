@@ -50,6 +50,10 @@ vision_analyze(image_url="<scratch>/b.png", question="...")
 Keep captures in the scratch directory, never in the user's own screenshot folder: they find
 their newest screenshots there by date.
 
+For the iso engine, `scripts/prep-probe.py` of the skill `rust-game-backlog-execution` first
+makes a scratch asset root that puts the player on any tile of any storey; launch the game on
+it with `--env ISO_ASSET_ROOT=<root>` and the level `probe`.
+
 ## Quick Reference
 
 ```
