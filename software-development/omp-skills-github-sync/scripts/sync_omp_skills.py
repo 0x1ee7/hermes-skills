@@ -272,8 +272,9 @@ def main():
         log(f"  {ahead} local commit(s) not on {a.remote}/{a.branch} yet")
     if a.dry_run:
         extra = f", fast-forward {behind}" if behind else ""
+        will_push = bool(added or updated or removed or paths or ahead) and not a.no_push
         log(f"RESULT: dry-run: would add {len(added)}, update {len(updated)}, remove {len(removed)}{extra}"
-            f", push {'no' if a.no_push else 'yes'}")
+            f", push {'yes' if will_push else 'no'}")
         return 0
     if not (paths or ahead):
         log("RESULT: up-to-date")
