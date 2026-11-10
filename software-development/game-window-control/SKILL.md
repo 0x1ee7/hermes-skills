@@ -137,6 +137,15 @@ Treat any other engine as unknown until step 2 passes, and add what you learn to
 - **Sound.** A driven game plays through the user's speakers while they work. Launch it with
   its mute switch when sound is not what you check (`--env ISO_AUDIO=0` for the iso engine);
   check audio headlessly instead, or leave the listening to the user.
+- **A script cursor in shares resolves once.** A synthetic mouse line like `move 50% 50%` becomes
+  pixels when it runs; after a resize the cursor is no longer in the middle, and a game that aims at
+  the cursor turns. Write the move again after every resize.
+- **Resizing without focus.** `SetWindowPos` on the game's own window with
+  `SWP_NOACTIVATE | SWP_NOZORDER | SWP_NOMOVE`, the size from `AdjustWindowRect` for the wanted client
+  area, changes the size without raising it or taking input; capture after a few seconds and check the
+  capture's size is the one asked for.
+- **Logs append.** `launch --log FILE` appends across launches: truncate the file before each run,
+  or split on the game's first-frame line, before counting anything in it.
 
 ## Safety (hard rules)
 

@@ -30,3 +30,15 @@ Mistakes made (and fixed) in a 40-file session; each cost a turn.
 ## Habit
 
 `read` range -> one edit call with all related ops -> check the echoed region -> `cargo fmt && cargo check`. For line-count tables in docs (reading order), take counts from `wc -l` after the final edit.
+
+## Shell quirks on the Windows host (Git Bash under the tool)
+
+- **Never `cd C:/...` in a command.** It fails ("volume label syntax is incorrect") and short-circuits
+  an `&&` chain: it silently skipped a release build (the copy was a stale binary), a file restore and
+  a docs edit in one week. Set the tool's `cwd` instead; after a chain, check its first real output.
+- **No `/dev/null` and no process substitution** (`2>/dev/null`, `<(...)`): write to a temp file.
+- **`env VAR=x cmd` fails**; write `VAR=x cmd`.
+- **`.git/index.lock` exists**: another git process holds it. Check `tasklist | grep -i git` and wait a
+  few seconds; it clears itself. Never delete it while a git process may be running.
+- **A `git checkout -b` that failed** leaves you on the old branch: confirm with
+  `git branch --show-current` before the first commit.
